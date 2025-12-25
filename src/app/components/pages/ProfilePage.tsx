@@ -2,12 +2,37 @@ import { motion } from 'motion/react';
 import { GlassCard } from '../GlassCard';
 import { Footer } from '../Footer';
 import { Brain, Dna, Scan, User, Shield, ChevronRight } from 'lucide-react';
+import { computeCognitiveRisk } from '../../utils/risk';
+import type { CognitiveAssessmentData } from '../screens/CognitiveAssessmentScreen';
 
 interface ProfilePageProps {
   onNavigate: (page: string) => void;
 }
 
+interface StoredAgentData {
+  cognitive?: CognitiveAssessmentData;
+  genetic?: any;
+  structural?: any;
+}
+
+const STORAGE_LATEST_AGENT_DATA_KEY = 'triad_latestAgentData';
+
+const safeParseJson = <T,>(raw: string | null): T | null => {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+};
+
 export function ProfilePage({ onNavigate }: ProfilePageProps) {
+  const latest = safeParseJson<StoredAgentData>(localStorage.getItem(STORAGE_LATEST_AGENT_DATA_KEY)) ?? {};
+  const hasCognitive = !!latest.cognitive;
+  const hasGenetic = !!latest.genetic;
+  const hasStructural = !!latest.structural;
+  const cognitiveRisk = hasCognitive ? computeCognitiveRisk(latest.cognitive as CognitiveAssessmentData) : null;
+
   return (
     <div className="min-h-screen bg-[#0F172A]">
       <div className="pt-32 pb-20 px-6">
@@ -67,7 +92,7 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
                 <div className="flex items-start gap-3">
                   <Shield className="w-5 h-5 text-[#10B981] mt-0.5" />
                   <p className="text-white/70 text-xs">
-                    For the demo, data is not persisted across refresh. In production this would integrate secure auth, encrypted storage, and consent management.
+                    Latest screening snapshot is stored locally in your browser for this demo. In production this would integrate secure auth, encrypted storage, and consent management.
                   </p>
                 </div>
               </div>
@@ -84,7 +109,11 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
                       <span className="text-white/80 text-sm">Agent 1</span>
                     </div>
                     <div className="text-white text-lg">Cognitive</div>
-                    <div className="text-white/60 text-xs">No run yet</div>
+                    <div className="text-white/60 text-xs">
+                      {hasCognitive
+                        ? `Completed • Risk ${cognitiveRisk}%`
+                        : 'No run yet'}
+                    </div>
                   </div>
                   <div className="p-4 bg-white/5 rounded-lg">
                     <div className="flex items-center gap-3 mb-2">
@@ -92,7 +121,11 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
                       <span className="text-white/80 text-sm">Agent 2</span>
                     </div>
                     <div className="text-white text-lg">Genetic</div>
-                    <div className="text-white/60 text-xs">No run yet</div>
+                    <div className="text-white/60 text-xs">
+                      {hasGenetic
+                        ? `Completed • ${latest.genetic?.apoeStatus || 'Profile saved'}`
+                        : 'No run yet'}
+                    </div>
                   </div>
                   <div className="p-4 bg-white/5 rounded-lg">
                     <div className="flex items-center gap-3 mb-2">
@@ -100,7 +133,11 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
                       <span className="text-white/80 text-sm">Agent 3</span>
                     </div>
                     <div className="text-white text-lg">Structural</div>
-                    <div className="text-white/60 text-xs">No run yet</div>
+                    <div className="text-white/60 text-xs">
+                      {hasStructural
+                        ? `Completed • ${latest.structural?.scanType || 'Scan saved'}`
+                        : 'No run yet'}
+                    </div>
                   </div>
                 </div>
 

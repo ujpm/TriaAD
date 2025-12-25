@@ -3,6 +3,7 @@ import { GlassCard } from '../GlassCard';
 import { Download, ChevronRight, Info } from 'lucide-react';
 import { Navbar } from '../Navbar';
 import { Footer } from '../Footer';
+import { computeCognitiveRisk } from '../../utils/risk';
 
 interface ResultsData {
   cognitive?: any;
@@ -37,7 +38,7 @@ export function ResultsScreen({
       : 'Agent 1 Complete';
   
   // Calculate combined risk score
-  const cognitiveRisk = 12; // Mock data
+  const cognitiveRisk = hasCognitive ? computeCognitiveRisk(data.cognitive) : 0;
   const geneticRisk = hasGenetic ? (data.genetic.apoeStatus?.includes('ε4') ? 35 : 8) : 0;
   const structuralRisk = hasStructural ? 28 : 0;
   

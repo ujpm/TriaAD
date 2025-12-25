@@ -12,6 +12,7 @@ interface CognitiveAssessmentScreenProps {
 }
 
 export interface CognitiveAssessmentData {
+  timestamp?: string;
   demographics: {
     age: string;
     occupation: string;

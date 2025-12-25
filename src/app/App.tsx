@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navbar } from './components/Navbar';
 import { LandingPage } from './components/pages/LandingPage';
 import { AboutPage } from './components/pages/AboutPage';
@@ -23,10 +23,33 @@ interface AgentData {
   structural?: any;
 }
 
+const STORAGE_CURRENT_AGENT_DATA_KEY = 'triad_currentAgentData';
+const STORAGE_LATEST_AGENT_DATA_KEY = 'triad_latestAgentData';
+
+const safeParseJson = <T,>(raw: string | null): T | null => {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+};
+
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('landing');
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
-  const [agentData, setAgentData] = useState<AgentData>({});
+  const [agentData, setAgentData] = useState<AgentData>(() => {
+    const restored = safeParseJson<AgentData>(localStorage.getItem(STORAGE_CURRENT_AGENT_DATA_KEY));
+    return restored ?? {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_CURRENT_AGENT_DATA_KEY, JSON.stringify(agentData));
+  }, [agentData]);
+
+  const persistLatest = (data: AgentData) => {
+    localStorage.setItem(STORAGE_LATEST_AGENT_DATA_KEY, JSON.stringify(data));
+  };
 
   const handleNavigate = (page: string) => {
     setCurrentPage(page as Page);
@@ -41,7 +64,10 @@ export default function App() {
   };
 
   const handleCognitiveComplete = (data: CognitiveAssessmentData) => {
-    setAgentData({ cognitive: data });
+    const enriched = { ...data, timestamp: new Date().toISOString() };
+    const next = { cognitive: enriched };
+    setAgentData(next);
+    persistLatest(next);
     setCurrentScreen('cognitiveResults');
   };
 
@@ -50,7 +76,11 @@ export default function App() {
   };
 
   const handleGeneticComplete = (data: any) => {
-    setAgentData(prev => ({ ...prev, genetic: data }));
+    setAgentData(prev => {
+      const next = { ...prev, genetic: data };
+      persistLatest(next);
+      return next;
+    });
     setCurrentScreen('geneticResults');
   };
 
@@ -59,7 +89,11 @@ export default function App() {
   };
 
   const handleStructuralComplete = (data: any) => {
-    setAgentData(prev => ({ ...prev, structural: data }));
+    setAgentData(prev => {
+      const next = { ...prev, structural: data };
+      persistLatest(next);
+      return next;
+    });
     setCurrentScreen('finalResults');
   };
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { GlassCard } from '../GlassCard';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
@@ -58,8 +58,6 @@ type Step =
   | 'scam'
   | 'complete';
 
-type StroopInk = 'red' | 'green' | 'blue' | 'yellow';
-
 const FILLER_WORDS = new Set(['um', 'umm', 'uh', 'er', 'ah', 'like']);
 
 const getWords = (text: string) =>
@@ -86,25 +84,8 @@ const analyzeTranscript = (transcript: string) => {
   };
 };
 
-const inkStyles: Record<StroopInk, string> = {
-  red: 'text-[#EF4444]',
-  green: 'text-[#10B981]',
-  blue: 'text-[#06B6D4]',
-  yellow: 'text-[#FBB020]'
-};
 
-const wordLabel: Record<StroopInk, string> = {
-  red: 'RED',
-  green: 'GREEN',
-  blue: 'BLUE',
-  yellow: 'YELLOW'
-};
-
-const randomInk = (exclude?: StroopInk): StroopInk => {
-  const inks: StroopInk[] = ['red', 'green', 'blue', 'yellow'];
-  const options = exclude ? inks.filter(i => i !== exclude) : inks;
-  return options[Math.floor(Math.random() * options.length)];
-};
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 export function CognitiveAssessmentScreen({ onBack, onComplete, onNavigate }: CognitiveAssessmentScreenProps) {
   const [currentStep, setCurrentStep] = useState<Step>('demographics');
@@ -146,16 +127,8 @@ export function CognitiveAssessmentScreen({ onBack, onComplete, onNavigate }: Co
   const currentStepIndex = steps.indexOf(currentStep);
   const progress = ((currentStepIndex + 1) / steps.length) * 100;
 
-  const speechRecognitionRef = useRef<any>(null);
-  const [isListening, setIsListening] = useState(false);
-
-  const [stroopStarted, setStroopStarted] = useState(false);
-  const [stroopIndex, setStroopIndex] = useState(0);
-  const [stroopWord, setStroopWord] = useState<StroopInk>('red');
-  const [stroopInk, setStroopInk] = useState<StroopInk>('blue');
-  const [stroopCorrect, setStroopCorrect] = useState(0);
-  const [stroopTotalMs, setStroopTotalMs] = useState(0);
-  const stroopStartTimeRef = useRef<number>(0);
+  const [isVoiceSimulating, setIsVoiceSimulating] = useState(false);
+  const [isStroopSimulating, setIsStroopSimulating] = useState(false);
 
   const stroopTotalTrials = useMemo(() => {
     const education = assessmentData.demographics.education;
@@ -163,16 +136,6 @@ export function CognitiveAssessmentScreen({ onBack, onComplete, onNavigate }: Co
     if (education === 'masters') return 14;
     return 12;
   }, [assessmentData.demographics.education]);
-
-  useEffect(() => {
-    return () => {
-      try {
-        speechRecognitionRef.current?.stop?.();
-      } catch {
-        // noop
-      }
-    };
-  }, []);
 
   const handleNext = () => {
     if (currentStep === 'complete') {
@@ -221,107 +184,49 @@ export function CognitiveAssessmentScreen({ onBack, onComplete, onNavigate }: Co
     }));
   };
 
-  const startVoiceCapture = () => {
-    const SpeechRecognitionCtor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognitionCtor) {
-      return;
-    }
+  const simulateVoice = () => {
+    if (isVoiceSimulating) return;
+    setIsVoiceSimulating(true);
 
-    try {
-      if (speechRecognitionRef.current) {
-        speechRecognitionRef.current.stop?.();
-      }
-    } catch {
-      // noop
-    }
-
-    const recognition = new SpeechRecognitionCtor();
-    recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.lang = 'en-US';
-
-    recognition.onresult = (event: any) => {
-      const chunks: string[] = [];
-      for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        const result = event.results[i];
-        if (result?.[0]?.transcript) chunks.push(result[0].transcript);
-      }
-      if (chunks.length) {
-        const incoming = chunks.join(' ');
-        setAssessmentData(prev => {
-          const current = prev.voice?.transcript || '';
-          const transcript = `${current} ${incoming}`.trim();
-          const analyzed = analyzeTranscript(transcript);
-          return {
-            ...prev,
-            voice: {
-              transcript,
-              ...analyzed
-            }
-          };
-        });
-      }
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognition.onerror = () => {
-      setIsListening(false);
-    };
-
-    speechRecognitionRef.current = recognition;
-    setIsListening(true);
-    recognition.start();
+    const education = assessmentData.demographics.education;
+    const sample =
+      education === 'doctorate'
+        ? "This morning I reviewed some notes, prepared coffee, and then went through my schedule for the day. I walked outside for a few minutes, came back, and started answering messages."
+        : "Um, I woke up, made coffee, and then I, uh, got ready for the day. I went outside a little bit and then I started working and answering messages.";
 
     window.setTimeout(() => {
-      try {
-        recognition.stop();
-      } catch {
-        // noop
-      }
-    }, 15000);
+      updateVoiceTranscript(sample);
+      setIsVoiceSimulating(false);
+    }, 2500);
   };
 
-  const startStroop = () => {
-    setStroopStarted(true);
-    setStroopIndex(0);
-    setStroopCorrect(0);
-    setStroopTotalMs(0);
-    const word = randomInk();
-    const ink = randomInk(word);
-    setStroopWord(word);
-    setStroopInk(ink);
-    stroopStartTimeRef.current = performance.now();
-    setAssessmentData(prev => ({
-      ...prev,
-      game: {
-        kind: 'stroop',
-        trials: 0,
-        accuracy: 0,
-        averageReactionMs: 0
-      }
-    }));
-  };
+  const simulateStroop = () => {
+    if (isStroopSimulating) return;
+    setIsStroopSimulating(true);
 
-  const answerStroop = (answer: StroopInk) => {
-    if (!stroopStarted) return;
-    const ms = Math.max(0, Math.round(performance.now() - stroopStartTimeRef.current));
-    const correct = answer === stroopInk;
+    const ageNum = Number.parseInt(assessmentData.demographics.age, 10);
+    const age = Number.isFinite(ageNum) ? ageNum : 50;
+    const education = assessmentData.demographics.education;
 
-    setStroopTotalMs(prev => prev + ms);
-    setStroopCorrect(prev => prev + (correct ? 1 : 0));
+    const expectedMsBase = 650 + ((age - 20) / 10) * 8;
+    const educationAdjust =
+      education === 'doctorate'
+        ? -75
+        : education === 'masters'
+          ? -50
+          : education === 'bachelors'
+            ? -25
+            : 0;
+    const expectedMs = expectedMsBase + educationAdjust;
 
-    const nextIndex = stroopIndex + 1;
-    setStroopIndex(nextIndex);
+    const expectedAcc = education === 'doctorate' ? 92 : education === 'masters' ? 90 : education === 'bachelors' ? 88 : 85;
 
-    if (nextIndex >= stroopTotalTrials) {
-      const finalCorrect = stroopCorrect + (correct ? 1 : 0);
-      const finalTotalMs = stroopTotalMs + ms;
-      const accuracy = Math.round((finalCorrect / stroopTotalTrials) * 100);
-      const averageReactionMs = Math.round(finalTotalMs / stroopTotalTrials);
+    // Demo jitter: deterministic-ish from inputs so it looks stable in demos.
+    const jitterSeed = (age + (education?.length ?? 0) * 7 + (assessmentData.demographics.occupation?.length ?? 0)) % 17;
+    const accuracy = clamp(Math.round(expectedAcc - 6 + jitterSeed * 0.6), 72, 99);
+    const averageReactionMs = clamp(Math.round(expectedMs + 40 + jitterSeed * 9), 420, 1400);
 
+    window.setTimeout(() => {
       setAssessmentData(prev => ({
         ...prev,
         game: {
@@ -331,16 +236,8 @@ export function CognitiveAssessmentScreen({ onBack, onComplete, onNavigate }: Co
           averageReactionMs
         }
       }));
-
-      setStroopStarted(false);
-      return;
-    }
-
-    const word = randomInk();
-    const ink = Math.random() < 0.75 ? randomInk(word) : word;
-    setStroopWord(word);
-    setStroopInk(ink);
-    stroopStartTimeRef.current = performance.now();
+      setIsStroopSimulating(false);
+    }, 2000);
   };
 
   const canProceed = () => {
@@ -349,7 +246,7 @@ export function CognitiveAssessmentScreen({ onBack, onComplete, onNavigate }: Co
         return Object.values(assessmentData.demographics).every(val => val !== '');
       case 'voice': {
         const totalWords = assessmentData.voice?.totalWords ?? 0;
-        return totalWords >= 15;
+        return totalWords > 0;
       }
       case 'stroop': {
         const trials = assessmentData.game?.trials ?? 0;
@@ -446,8 +343,6 @@ export function CognitiveAssessmentScreen({ onBack, onComplete, onNavigate }: Co
         );
 
       case 'voice': {
-        const SpeechRecognitionCtor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        const supported = !!SpeechRecognitionCtor;
         const voice = assessmentData.voice;
 
         return (
@@ -458,39 +353,55 @@ export function CognitiveAssessmentScreen({ onBack, onComplete, onNavigate }: Co
             </p>
 
             <div className="p-6 bg-white/5 rounded-lg">
-              <p className="text-white/80 mb-3">
-                Speak for ~15 seconds: describe your morning routine or a recent event.
+              <p className="text-white/80 mb-4">
+                Demo simulation. In the real app, an AI model will analyze a recorded voice sample.
               </p>
 
-              <div className="flex flex-wrap gap-3 items-center">
-                <button
-                  onClick={startVoiceCapture}
-                  disabled={!supported || isListening}
-                  className={`px-6 py-3 rounded-lg transition-all ${
-                    supported && !isListening
-                      ? 'bg-gradient-to-r from-[#06B6D4] to-[#10B981] text-white'
-                      : 'bg-white/5 text-white/30 cursor-not-allowed'
-                  }`}
-                >
-                  {supported ? (isListening ? 'Listening…' : 'Start Voice Test') : 'Speech Recognition Unavailable'}
-                </button>
+              <div className="flex flex-col md:flex-row gap-6">
+                <div className="flex-1">
+                  <div className="flex items-center justify-center gap-1 h-32 mb-4">
+                    {Array.from({ length: 48 }).map((_, i) => {
+                      const baseHeight = 18 + ((i * 37) % 80);
+                      const color = i % 3 === 0 ? '#06B6D4' : i % 3 === 1 ? '#10B981' : '#FBB020';
+                      return (
+                        <motion.div
+                          key={i}
+                          className="w-2 rounded-full"
+                          style={{ backgroundColor: color }}
+                          animate={{ height: isVoiceSimulating ? [16, baseHeight, 16] : 16 }}
+                          transition={{
+                            duration: 0.6,
+                            repeat: isVoiceSimulating ? Infinity : 0,
+                            delay: i * 0.01
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
 
-                <div className="text-white/60 text-sm">
-                  {supported
-                    ? 'You can also paste/edit the transcript below.'
-                    : 'Paste a transcript below (demo fallback).'}
+                  <button
+                    onClick={simulateVoice}
+                    disabled={isVoiceSimulating}
+                    className={`w-full px-6 py-3 rounded-lg transition-all ${
+                      !isVoiceSimulating
+                        ? 'bg-gradient-to-r from-[#06B6D4] to-[#10B981] text-white'
+                        : 'bg-white/5 text-white/30 cursor-not-allowed'
+                    }`}
+                  >
+                    {isVoiceSimulating ? 'Simulating Voice…' : 'Run Demo Voice Test'}
+                  </button>
                 </div>
-              </div>
 
-              <div className="mt-4">
-                <label className="block text-white/80 mb-2">Transcript</label>
-                <textarea
-                  value={voice?.transcript || ''}
-                  onChange={(e) => updateVoiceTranscript(e.target.value)}
-                  rows={5}
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:border-[#06B6D4] focus:outline-none"
-                  placeholder="Paste or type what you said…"
-                />
+                <div className="flex-1">
+                  <label className="block text-white/80 mb-2">Transcript (demo)</label>
+                  <textarea
+                    value={voice?.transcript || ''}
+                    onChange={(e) => updateVoiceTranscript(e.target.value)}
+                    rows={6}
+                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:border-[#06B6D4] focus:outline-none"
+                    placeholder="Click 'Run Demo Voice Test' to generate a sample transcript…"
+                  />
+                </div>
               </div>
             </div>
 
@@ -526,74 +437,38 @@ export function CognitiveAssessmentScreen({ onBack, onComplete, onNavigate }: Co
               Objective signal. This tests inhibition/processing speed by forcing your brain to ignore the word and select the ink color.
             </p>
 
-            {!stroopStarted && (game?.trials ?? 0) === 0 && (
-              <div className="p-6 bg-white/5 rounded-lg">
-                <p className="text-white/80 mb-4">
-                  Tap <span className="text-[#06B6D4] font-medium">the ink color</span>, not the word.
-                </p>
-                <button
-                  onClick={startStroop}
-                  className="px-6 py-3 bg-gradient-to-r from-[#06B6D4] to-[#10B981] rounded-lg text-white transition-opacity hover:opacity-90"
-                >
-                  Start Test ({stroopTotalTrials} trials)
-                </button>
-              </div>
-            )}
+            <div className="p-6 bg-white/5 rounded-lg">
+              <p className="text-white/80 mb-4">
+                Demo simulation. In the real app, a cognitive game engine will capture reaction time and accuracy.
+              </p>
 
-            {stroopStarted && (
-              <div className="p-6 bg-white/5 rounded-lg">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="text-white/60 text-sm font-mono">
-                    TRIAL {stroopIndex + 1} / {stroopTotalTrials}
-                  </div>
-                  <div className="text-white/60 text-sm font-mono">Answer as fast as you can</div>
+              <button
+                onClick={simulateStroop}
+                disabled={isStroopSimulating}
+                className={`px-6 py-3 rounded-lg transition-all ${
+                  !isStroopSimulating
+                    ? 'bg-gradient-to-r from-[#06B6D4] to-[#10B981] text-white'
+                    : 'bg-white/5 text-white/30 cursor-not-allowed'
+                }`}
+              >
+                {isStroopSimulating ? 'Simulating Stroop…' : `Run Demo Stroop Test (${stroopTotalTrials} trials)`}
+              </button>
+
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 bg-white/5 rounded-lg">
+                  <div className="text-white/60 text-xs">TRIALS</div>
+                  <div className="text-2xl font-mono text-white">{game?.trials ?? 0}</div>
                 </div>
-
-                <div className="text-center py-10">
-                  <div className={`text-6xl font-mono tracking-wider ${inkStyles[stroopInk]}`}>{wordLabel[stroopWord]}</div>
+                <div className="p-4 bg-white/5 rounded-lg">
+                  <div className="text-white/60 text-xs">ACCURACY</div>
+                  <div className="text-2xl font-mono text-white">{game?.accuracy ?? 0}%</div>
                 </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {(Object.keys(wordLabel) as StroopInk[]).map((ink) => (
-                    <button
-                      key={ink}
-                      onClick={() => answerStroop(ink)}
-                      className="py-3 px-4 bg-white/10 text-white/80 rounded-lg hover:bg-white/20 transition-colors"
-                    >
-                      {wordLabel[ink]}
-                    </button>
-                  ))}
+                <div className="p-4 bg-white/5 rounded-lg">
+                  <div className="text-white/60 text-xs">AVG REACTION</div>
+                  <div className="text-2xl font-mono text-white">{game?.averageReactionMs ?? 0}ms</div>
                 </div>
               </div>
-            )}
-
-            {!stroopStarted && (game?.trials ?? 0) > 0 && (
-              <div className="p-6 bg-white/5 rounded-lg">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 bg-white/5 rounded-lg">
-                    <div className="text-white/60 text-xs">TRIALS</div>
-                    <div className="text-2xl font-mono text-white">{game?.trials}</div>
-                  </div>
-                  <div className="p-4 bg-white/5 rounded-lg">
-                    <div className="text-white/60 text-xs">ACCURACY</div>
-                    <div className="text-2xl font-mono text-white">{game?.accuracy}%</div>
-                  </div>
-                  <div className="p-4 bg-white/5 rounded-lg">
-                    <div className="text-white/60 text-xs">AVG REACTION</div>
-                    <div className="text-2xl font-mono text-white">{game?.averageReactionMs}ms</div>
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <button
-                    onClick={startStroop}
-                    className="px-6 py-3 bg-white/10 text-white/80 rounded-lg hover:bg-white/20 transition-colors"
-                  >
-                    Retake Test
-                  </button>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         );
       }

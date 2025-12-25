@@ -5,6 +5,8 @@ import { Navbar } from '../Navbar';
 import { Footer } from '../Footer';
 import { computeCognitiveRisk } from '../../utils/risk';
 
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
 interface ResultsData {
   cognitive?: any;
   genetic?: any;
@@ -29,6 +31,55 @@ export function ResultsScreen({
   const hasCognitive = !!data.cognitive;
   const hasGenetic = !!data.genetic;
   const hasStructural = !!data.structural;
+
+  const ageNum = hasCognitive ? Number.parseInt(data.cognitive?.demographics?.age, 10) : NaN;
+  const age = Number.isFinite(ageNum) ? ageNum : 50;
+
+  const education = hasCognitive ? (data.cognitive?.demographics?.education as string | undefined) : undefined;
+  const educationTier =
+    education === 'doctorate'
+      ? 'doctorate'
+      : education === 'masters'
+        ? 'masters'
+        : education === 'bachelors'
+          ? 'bachelors'
+          : 'other';
+
+  // Age normalization layer: reaction time slows ~5-10ms per decade; use 8ms.
+  const expectedMsBase = 650 + ((age - 20) / 10) * 8;
+  // Cognitive reserve: stricter thresholds for higher education.
+  const educationAdjust =
+    educationTier === 'doctorate'
+      ? -75
+      : educationTier === 'masters'
+        ? -50
+        : educationTier === 'bachelors'
+          ? -25
+          : 0;
+  const expectedMs = Math.round(expectedMsBase + educationAdjust);
+
+  const voice = hasCognitive ? data.cognitive?.voice : undefined;
+  const game = hasCognitive ? data.cognitive?.game : undefined;
+  const avgReactionMs: number | null = typeof game?.averageReactionMs === 'number' ? game.averageReactionMs : null;
+  const accuracy: number | null = typeof game?.accuracy === 'number' ? game.accuracy : null;
+
+  const voiceHealth = voice
+    ? Math.round(
+        clamp(
+          100 -
+            (Math.max(0, (0.42 - (voice.vocabularyRichness ?? 0)) * 250) + Math.max(0, ((voice.hesitationRate ?? 0) - 0.06) * 700)),
+          0,
+          100
+        )
+      )
+    : 0;
+  const voiceStatus = !voice ? 'MISSING' : voiceHealth >= 75 ? 'NORMAL' : voiceHealth >= 55 ? 'WARNING' : 'HIGH';
+
+  const gameHealth =
+    avgReactionMs == null || accuracy == null
+      ? 0
+      : Math.round(clamp(100 - Math.max(0, avgReactionMs - expectedMs) / 6 - Math.max(0, (90 - accuracy) * 2.5), 0, 100));
+  const gameStatus = avgReactionMs == null || accuracy == null ? 'MISSING' : gameHealth >= 75 ? 'NORMAL' : gameHealth >= 55 ? 'WARNING' : 'HIGH';
 
   const reportTitle = hasStructural ? 'Complete Report' : hasGenetic ? 'Genetic Report' : 'Cognitive Report';
   const completionLabel = hasStructural
@@ -108,7 +159,7 @@ export function ResultsScreen({
                   <span className="text-[#06B6D4] font-mono">✓</span>
                 </div>
                 <div className="text-2xl font-mono text-[#06B6D4]">{cognitiveRisk}%</div>
-                <div className="text-xs text-white/60 mt-1">Voice & Reflex Analysis</div>
+                <div className="text-xs text-white/60 mt-1">Voice & Stroop Analysis</div>
               </div>
               
               {hasGenetic && (
@@ -164,54 +215,91 @@ export function ResultsScreen({
                 <div>
                   <div className="flex justify-between mb-2">
                     <span className="text-white/80 text-sm font-mono">Voice Biomarkers</span>
-                    <span className="text-[#10B981] text-sm font-mono">NORMAL</span>
+                    <span
+                      className={`text-sm font-mono ${
+                        voiceStatus === 'NORMAL'
+                          ? 'text-[#10B981]'
+                          : voiceStatus === 'WARNING'
+                            ? 'text-[#FBB020]'
+                            : voiceStatus === 'HIGH'
+                              ? 'text-[#DC2626]'
+                              : 'text-white/40'
+                      }`}
+                    >
+                      {voiceStatus}
+                    </span>
                   </div>
                   <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                     <motion.div
-                      className="h-full bg-[#10B981]"
+                      className={`h-full ${voiceStatus === 'NORMAL' ? 'bg-[#10B981]' : voiceStatus === 'WARNING' ? 'bg-[#FBB020]' : 'bg-[#DC2626]'}`}
                       initial={{ width: '0%' }}
-                      animate={{ width: '94%' }}
+                      animate={{ width: `${voice ? voiceHealth : 0}%` }}
                       transition={{ duration: 1, delay: 0.2 }}
                     />
                   </div>
                   <p className="text-white/60 text-xs mt-2">
-                    Vocabulary richness and pause patterns within normal ranges
+                    {voice
+                      ? `Vocab richness ${Math.round((voice.vocabularyRichness ?? 0) * 100)}% • Hesitation ${Math.round((voice.hesitationRate ?? 0) * 100)}%`
+                      : 'No voice sample captured (you can paste a transcript in Agent 1)'}
                   </p>
                 </div>
 
                 <div>
                   <div className="flex justify-between mb-2">
-                    <span className="text-white/80 text-sm font-mono">Pattern Recognition</span>
-                    <span className="text-[#10B981] text-sm font-mono">NORMAL</span>
+                    <span className="text-white/80 text-sm font-mono">Executive Function (Stroop)</span>
+                    <span
+                      className={`text-sm font-mono ${
+                        gameStatus === 'NORMAL'
+                          ? 'text-[#10B981]'
+                          : gameStatus === 'WARNING'
+                            ? 'text-[#FBB020]'
+                            : gameStatus === 'HIGH'
+                              ? 'text-[#DC2626]'
+                              : 'text-white/40'
+                      }`}
+                    >
+                      {gameStatus}
+                    </span>
                   </div>
                   <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                     <motion.div
-                      className="h-full bg-[#10B981]"
+                      className={`h-full ${gameStatus === 'NORMAL' ? 'bg-[#10B981]' : gameStatus === 'WARNING' ? 'bg-[#FBB020]' : 'bg-[#DC2626]'}`}
                       initial={{ width: '0%' }}
-                      animate={{ width: '89%' }}
+                      animate={{ width: `${avgReactionMs != null && accuracy != null ? gameHealth : 0}%` }}
                       transition={{ duration: 1, delay: 0.4 }}
                     />
                   </div>
                   <p className="text-white/60 text-xs mt-2">
-                    Cognitive reflex game performance shows good spatial reasoning
+                    {avgReactionMs != null && accuracy != null
+                      ? `Accuracy ${accuracy}% • ${avgReactionMs}ms avg (expected ~${expectedMs}ms)`
+                      : 'No Stroop results captured'}
                   </p>
                 </div>
 
                 <div>
                   <div className="flex justify-between mb-2">
                     <span className="text-white/80 text-sm font-mono">Reaction Time</span>
-                    <span className="text-[#06B6D4] text-sm font-mono">887ms AVG</span>
+                    <span className="text-[#06B6D4] text-sm font-mono">
+                      {avgReactionMs != null ? `${avgReactionMs}ms AVG` : '—'}
+                    </span>
                   </div>
                   <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                     <motion.div
                       className="h-full bg-[#06B6D4]"
                       initial={{ width: '0%' }}
-                      animate={{ width: '91%' }}
+                      animate={{
+                        width:
+                          avgReactionMs == null
+                            ? '0%'
+                            : `${Math.max(0, Math.min(100, Math.round(100 - Math.max(0, avgReactionMs - expectedMs) / 6)))}%`
+                      }}
                       transition={{ duration: 1, delay: 0.6 }}
                     />
                   </div>
                   <p className="text-white/60 text-xs mt-2">
-                    Response latency within expected range for age group
+                    {avgReactionMs != null
+                      ? `Normalized by age (${age}) and education (${education || '—'})`
+                      : 'Complete the Stroop test to capture reaction time'}
                   </p>
                 </div>
               </div>

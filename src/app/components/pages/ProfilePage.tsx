@@ -32,6 +32,8 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
   const hasGenetic = !!latest.genetic;
   const hasStructural = !!latest.structural;
   const cognitiveRisk = hasCognitive ? computeCognitiveRisk(latest.cognitive as CognitiveAssessmentData) : null;
+  const hasVoice = !!latest.cognitive?.voice && (latest.cognitive.voice.totalWords ?? 0) > 0;
+  const hasStroop = !!latest.cognitive?.game && (latest.cognitive.game.trials ?? 0) > 0;
 
   return (
     <div className="min-h-screen bg-[#0F172A]">
@@ -111,7 +113,7 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
                     <div className="text-white text-lg">Cognitive</div>
                     <div className="text-white/60 text-xs">
                       {hasCognitive
-                        ? `Completed • Risk ${cognitiveRisk}%`
+                        ? `Completed • Risk ${cognitiveRisk}% • ${hasVoice ? 'Voice' : 'No voice'} • ${hasStroop ? 'Stroop' : 'No Stroop'}`
                         : 'No run yet'}
                     </div>
                   </div>

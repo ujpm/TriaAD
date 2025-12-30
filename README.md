@@ -1,71 +1,49 @@
-# TriAD
+# TriAD: Multi-Agent Alzheimer’s Screening Platform
 
-TriAD is a demo frontend for a progressive, multi-agent Alzheimer’s screening experience.
+TriAD is a progressive, multi-agent interface designed to screen for early signs of Alzheimer's Disease (AD) by triangulating data from three distinct modalities: **Cognitive**, **Genetic**, and **Structural**.
 
-The UI walks a user through a step-by-step pipeline:
+> **Current Status**: *Data Collection & Model Integration Phase*
+>
+> This repository houses the **Client-Side Sensor Suite**. It is designed to capture novel biomarkers (voice acoustics, reaction time latency, and oculomotor inhibition) to feed into our backend risk models.
 
-- **Agent 1 (Cognitive)**: demographics + early-signal questions + scenario-based judgment prompts
-- **Agent 2 (Genetic)**: APOE selection and optional VCF upload (mocked)
-- **Agent 3 (Structural)**: scan type selection and MRI/CT upload (mocked)
+## Clinical Backend & Datasets
 
-This repository focuses on the **user experience** and **workflow**. It does **not** ship a clinical model.
+Unlike standard demos, TriAD is architected to be trained on ground-truth clinical data. The risk scoring algorithms are currently being calibrated using:
 
-The original design source is available on Figma:
-https://www.figma.com/design/gcqpDv8hOsvMDRRNMCp6IQ/TriAD
+* **Bio-Hermes-001 Dataset**: Utilizing the Global Alzheimer's Platform (GAP) data to correlate digital biomarkers (speech/cognitive) with Aβ PET scan positivity.
+* **Proprietary Cohort Data**: User-supplied datasets for fine-tuning voice biomarker sensitivity (hesitation rate, vocabulary richness).
 
-## Features
+## The Agent Architecture
 
-- **Cognitive → Genetic → Structural** flow with a report after each agent
-- Dynamic report titles:
-  - `Cognitive Report`
-  - `Genetic Report`
-  - `Complete Report`
-- **Next-agent CTA** on reports to continue the pipeline
-- **Local persistence** (demo): latest screening snapshot stored in `localStorage`
-- Mocked **Login / Register / Profile** pages for demo navigation
+The system is composed of three specialized agents, each serving as a **Data Sensor**:
+
+### Agent 1: The Cognitive Sensor (Active)
+Captures raw digital biomarkers often invisible to human observation.
+* **Voice Biomarkers**: Captures audio for Natural Language Processing (NLP) to detect syntactic simplification and hesitation frequency (mapped to Temporal Lobe health).
+* **Executive Function**: Interactive Stroop Test measures inhibition latency (ms) and processing speed (mapped to Frontal Lobe health).
+* *Implementation*: Web Speech API & High-Precision JS Timers.
+
+### Agent 2: The Genetic Validator
+Integrates deterministic risk factors to weight the cognitive signals.
+* **APOE Genotyping**: Weights risk scores based on ε4 allele presence.
+* **Polygenic Hazard**: (In Development) Ingestion of VCF files for broader variant analysis.
+
+### Agent 3: The Structural Analyst
+* **Imaging Pipeline**: Ingestion interface for MRI/CT DICOM files.
+* **Analysis**: Pre-processing for ResNet/CNN architectures to detect cortical atrophy and hippocampal volume loss.
+
+## Roadmap: From Collection to Inference
+
+1.  **Phase 1 (Current)**: Deploy "Sensor" frontend to capture standardized inputs (Voice/Reaction Time).
+2.  **Phase 2 (Calibration)**: Validate collected metrics against Bio-Hermes baselines.
+3.  **Phase 3 (Inference)**: Replace heuristic scoring with trained PyTorch/TensorFlow models served via API.
 
 ## Tech Stack
 
-- React + TypeScript
-- Vite
-- Tailwind CSS
-- `motion/react` for animations
-- `lucide-react` icons
+* **Frontend**: React + TypeScript, Vite, Tailwind CSS
+* **Sensors**: Web Speech API, Performance.now() (High Resolution Time)
+* **Visualization**: Recharts, Framer Motion
 
-## Getting Started
+## Disclaimer
 
-### Prerequisites
-
-- Node.js 18+ recommended
-- npm
-
-### Install
-
-```bash
-npm install
-```
-
-### Run (dev)
-
-```bash
-npm run dev
-```
-
-Then open the URL printed in the terminal (typically `http://localhost:5173`).
-
-## Scripts
-
-- `npm run dev` — start the development server
-- `npm run build` — production build
-- `npm run preview` — preview the production build locally
-
-## Demo Notes
-
-- **Authentication is mocked** (Login/Register just navigate to Profile).
-- **Uploads are mocked** (file names are captured, no backend storage).
-- Screening results are **for demonstration only**.
-
-## Medical Disclaimer
-
-TriAD is a screening demo and **does not provide medical diagnosis**.
-Always consult qualified healthcare professionals for medical advice, diagnosis, and treatment decisions.
+This software is currently in **Research & Development**. While based on clinical datasets (Bio-Hermes), the current output should be used for data validation and screening research, not as a standalone medical diagnosis tool.

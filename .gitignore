@@ -6,3 +6,5 @@ node_modules/
 
 ATTRIBUTIONS.md
 guidelines/
+.devcontainer/
+.vscode/

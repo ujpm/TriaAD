@@ -1,49 +1,63 @@
-# TriAD: Multi-Agent Alzheimer’s Screening Platform
+# TriAD: Multi-Modal Alzheimer’s Risk Stratification
 
-TriAD is a progressive, multi-agent interface designed to screen for early signs of Alzheimer's Disease (AD) by triangulating data from three distinct modalities: **Cognitive**, **Genetic**, and **Structural**.
+TriAD is a clinical-grade frontend interface designed to screen for Alzheimer's Disease (AD) by triangulating digital biomarkers with proprietary genetic and structural datasets.
 
-> **Current Status**: *Data Collection & Model Integration Phase*
+> **System Status**: *Data Ingestion & Validation Mode*
 >
-> This repository houses the **Client-Side Sensor Suite**. It is designed to capture novel biomarkers (voice acoustics, reaction time latency, and oculomotor inhibition) to feed into our backend risk models.
+> This platform serves as the deployment vehicle for our custom-trained risk models. It is architected to capture real-time user telemetry (voice acoustics, oculomotor latency) and correlate it with our ground-truth clinical cohorts.
 
-## Clinical Backend & Datasets
+## The Data Engine
 
-Unlike standard demos, TriAD is architected to be trained on ground-truth clinical data. The risk scoring algorithms are currently being calibrated using:
+Unlike generic screening tools, TriAD is built to interface directly with our validated clinical datasets:
 
-* **Bio-Hermes-001 Dataset**: Utilizing the Global Alzheimer's Platform (GAP) data to correlate digital biomarkers (speech/cognitive) with Aβ PET scan positivity.
-* **Proprietary Cohort Data**: User-supplied datasets for fine-tuning voice biomarker sensitivity (hesitation rate, vocabulary richness).
+1.  **Genetic Knowledge Base (`advp.hg38.tsv`)**:
+    * **Role**: Explainable AI (XAI) Dictionary.
+    * **Function**: Maps 130+ detected SNPs to clinically validated risk ratios (Odds Ratios), allowing the system to explain *why* a genetic flag was raised (e.g., *"Detected rs429358 on APOE gene"*).
+
+2.  **Patient Genetic Data (`preprocessed_alz_data.npz`)**:
+    * **Role**: Training ground for Agent 2.
+    * **Scale**: 5,076 patients with 130 preprocessed genetic features.
+    * **Model**: Random Forest classifier calibrated to detect "Silent Risk" before symptoms appear.
+
+3.  **Imaging Data (`train.parquet`)**:
+    * **Role**: Validation set for Agent 3.
+    * **Content**: MRI scans labeled by severity (Non-Demented vs. Mild Demented).
+    * **Model**: ResNet/CNN architecture for structural segmentation and atrophy detection.
 
 ## The Agent Architecture
 
-The system is composed of three specialized agents, each serving as a **Data Sensor**:
+The system utilizes a multi-agent "Sensor & Inference" architecture:
 
-### Agent 1: The Cognitive Sensor (Active)
-Captures raw digital biomarkers often invisible to human observation.
-* **Voice Biomarkers**: Captures audio for Natural Language Processing (NLP) to detect syntactic simplification and hesitation frequency (mapped to Temporal Lobe health).
-* **Executive Function**: Interactive Stroop Test measures inhibition latency (ms) and processing speed (mapped to Frontal Lobe health).
-* *Implementation*: Web Speech API & High-Precision JS Timers.
+### Agent 1: The Cognitive Sensor (Input)
+*Status: Active Telemetry Implementation*
+Because cognitive decline is dynamic, Agent 1 acts as a **Real-Time Sensor** to collect fresh digital biomarkers that standard datasets lack.
+* **Acoustic Feature Extraction**: Uses the Web Speech API to capture natural language samples, analyzing hesitation rate and vocabulary richness (Temporal Lobe indicators).
+* **Inhibition Latency**: Uses high-precision `performance.now()` timers in the interactive Stroop instrument to measure processing speed (Frontal Lobe indicators).
 
-### Agent 2: The Genetic Validator
-Integrates deterministic risk factors to weight the cognitive signals.
-* **APOE Genotyping**: Weights risk scores based on ε4 allele presence.
-* **Polygenic Hazard**: (In Development) Ingestion of VCF files for broader variant analysis.
+### Agent 2: The Geneticist (Prediction)
+*Status: Model Integration Phase*
+* **Input**: User-reported status or VCF file ingestion.
+* **Logic**: Runs inference against the `preprocessed_alz_data.npz` model.
+* **Explainability**: Cross-references positive hits against `advp.hg38.tsv` to provide medical context rather than black-box scores.
 
-### Agent 3: The Structural Analyst
-* **Imaging Pipeline**: Ingestion interface for MRI/CT DICOM files.
-* **Analysis**: Pre-processing for ResNet/CNN architectures to detect cortical atrophy and hippocampal volume loss.
+### Agent 3: The Specialist (Validation)
+*Status: Imaging Pipeline*
+* **Input**: DICOM/Image upload pipeline.
+* **Logic**: Pre-processing interface for ResNet/CNN inference models trained on `train.parquet`.
 
 ## Roadmap: From Collection to Inference
 
-1.  **Phase 1 (Current)**: Deploy "Sensor" frontend to capture standardized inputs (Voice/Reaction Time).
-2.  **Phase 2 (Calibration)**: Validate collected metrics against Bio-Hermes baselines.
-3.  **Phase 3 (Inference)**: Replace heuristic scoring with trained PyTorch/TensorFlow models served via API.
+* **Phase 1 (Current)**: Deploy "Sensor" frontend (Agent 1) to capture standardized inputs (Voice/Reaction Time).
+* **Phase 2 (Training)**: Train the Genetic Model (Random Forest) and Imaging Model (FastAI/PyTorch) using the provided datasets.
+* **Phase 3 (Integration)**: Connect the frontend `risk.ts` scoring logic to a Python backend serving the trained models.
 
 ## Tech Stack
 
 * **Frontend**: React + TypeScript, Vite, Tailwind CSS
-* **Sensors**: Web Speech API, Performance.now() (High Resolution Time)
+* **Sensors**: Web Speech API, High-Resolution Time API
 * **Visualization**: Recharts, Framer Motion
+* **Planned Backend**: Python (FastAPI), Scikit-learn (Genetic), PyTorch (Imaging)
 
 ## Disclaimer
 
-This software is currently in **Research & Development**. While based on clinical datasets (Bio-Hermes), the current output should be used for data validation and screening research, not as a standalone medical diagnosis tool.
+This software is a research instrument designed for use with specific clinical datasets. It is not a standalone diagnostic device. Always consult qualified healthcare professionals for medical advice, diagnosis, and treatment decisions.
